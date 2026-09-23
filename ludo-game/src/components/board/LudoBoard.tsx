@@ -2,7 +2,8 @@
  * Top-down board renderer. Every cell position comes from the logical
  * geometry (game/board/layout.ts) - the drawing cannot diverge from the rules.
  */
-import {memo, useMemo} from 'react';
+import {memo, useMemo, type ReactNode} from 'react';
+import {LinearGradient} from 'expo-linear-gradient';
 import {StyleSheet, View} from 'react-native';
 import {definitionFor} from '../../game/adventure/definitions.ts';
 import {START_INDEX} from '../../game/board/constants.ts';
@@ -21,6 +22,7 @@ import {
   type GameState,
   type PlayerColor,
 } from '../../game/types.ts';
+import {sceneryFor} from '../../themes/scenery.ts';
 import type {ThemeDefinition} from '../../themes/types.ts';
 import {AppText} from '../ui/AppText.tsx';
 import {Pawn, type PawnAnimation} from './Pawn.tsx';
@@ -45,25 +47,84 @@ export interface LudoBoardProps {
   readonly animations: ReadonlyMap<string, PawnAnimation>;
   readonly characterGlyph: (color: PlayerColor) => string;
   readonly reduceMotion: boolean;
+  /** Names drawn inside each colour's quadrant. */
+  readonly playerLabels?: Readonly<Partial<Record<PlayerColor, string>>>;
 }
 
 export const pawnKey = (color: PlayerColor, index: number) =>
   `${color}:${index}`;
+
+const ARROW_ROTATION: Readonly<Record<PlayerColor, string>> = {
+  green: '0deg',
+  yellow: '90deg',
+  blue: '180deg',
+  red: '270deg',
+};
+
+function Bevel({
+  left,
+  top,
+  size,
+  color,
+  light,
+  dark,
+  children,
+}: {
+  readonly left: number;
+  readonly top: number;
+  readonly size: number;
+  readonly color: string;
+  readonly light: string;
+  readonly dark: string;
+  readonly children?: ReactNode;
+}) {
+  const b = Math.max(1, size * 0.06);
+  return (
+    <View
+      style={[
+        styles.abs,
+        styles.center,
+        {
+          left,
+          top,
+          width: size,
+          height: size,
+          backgroundColor: color,
+          borderTopWidth: b,
+          borderLeftWidth: b,
+          borderBottomWidth: b,
+          borderRightWidth: b,
+          borderTopColor: light,
+          borderLeftColor: light,
+          borderBottomColor: dark,
+          borderRightColor: dark,
+        },
+      ]}>
+      {children}
+    </View>
+  );
+}
 
 const StaticBoard = memo(function StaticBoard({
   theme,
   cell,
   safe,
   adventure,
+  labels,
 }: {
   readonly theme: ThemeDefinition;
   readonly cell: number;
   readonly safe: readonly number[];
   readonly adventure: GameState['config']['adventure'];
+  readonly labels: Readonly<Partial<Record<PlayerColor, string>>>;
 }) {
   const p = theme.palette;
+  const scene = sceneryFor(theme);
   const startColor = new Map<number, PlayerColor>(
     PLAYER_COLORS.map(c => [START_INDEX[c], c])
+  );
+  const entryColor = new Map<number, PlayerColor>(
+    PLAYER_COLORS.map(c => [(START_INDEX[c] + 51) % 52, c])
   );
   const centerSize = CENTER_REGION.size * cell;
   const half = centerSize / 2;
@@ -72,31 +133,65 @@ const StaticBoard = memo(function StaticBoard({
       {PLAYER_COLORS.map(color => {
         const r = BASE_REGIONS[color];
         const colors = p.players[color];
+        const side = r.size * cell;
+        const disc = side * 0.78;
+        const labelOnTop = r.row === 0;
         return (
-          <View
+          <LinearGradient
             key={`base-${color}`}
+            colors={[colors.light, colors.main, colors.dark]}
+            locations={[0, 0.45, 1]}
+            start={{x: 0, y: 0}}
+            end={{x: 1, y: 1}}
             style={[
               styles.abs,
               {
                 left: r.col * cell,
                 top: r.row * cell,
-                width: r.size * cell,
-                height: r.size * cell,
-                backgroundColor: colors.main,
+                width: side,
+                height: side,
               },
             ]}>
             <View
               style={[
-                styles.baseInner,
+                styles.abs,
+                styles.disc,
                 {
-                  margin: cell * 0.6,
-                  borderRadius: (r.size * cell) / 2,
-                  backgroundColor: p.boardCell,
-                  borderColor: colors.dark,
+                  left: (side - disc) / 2,
+                  top: (side - disc) / 2,
+                  width: disc,
+                  height: disc,
+                  borderRadius: disc / 2,
+                  backgroundColor: scene.marble.base,
+                  borderColor: scene.marble.ring,
+                  borderWidth: Math.max(2, cell * 0.12),
                 },
-              ]}
-            />
-          </View>
+              ]}>
+              <LinearGradient
+                colors={[scene.marble.light, scene.marble.base]}
+                start={{x: 0.2, y: 0}}
+                end={{x: 0.8, y: 1}}
+                style={[StyleSheet.absoluteFill, {borderRadius: disc / 2}]}
+              />
+            </View>
+            {labels[color] ? (
+              <AppText
+                numberOfLines={1}
+                style={[
+                  styles.abs,
+                  styles.quadLabel,
+                  {
+                    left: cell * 0.3,
+                    right: cell * 0.3,
+                    fontSize: cell * 0.55,
+                    top: labelOnTop ? cell * 0.05 : undefined,
+                    bottom: labelOnTop ? undefined : cell * 0.05,
+                  },
+                ]}>
+                {labels[color]}
+              </AppText>
+            ) : null}
+          </LinearGradient>
         );
       })}
       {PLAYER_COLORS.flatMap(color =>
@@ -105,14 +200,13 @@ const StaticBoard = memo(function StaticBoard({
             key={`slot-${color}-${i}`}
             style={[
               styles.abs,
-              styles.slot,
               {
-                left: (slot.x - 0.42) * cell,
-                top: (slot.y - 0.42) * cell,
-                width: cell * 0.84,
-                height: cell * 0.84,
+                left: (slot.x - 0.4) * cell,
+                top: (slot.y - 0.2) * cell,
+                width: cell * 0.8,
+                height: cell * 0.4,
                 borderRadius: cell,
-                backgroundColor: p.players[color].light,
+                backgroundColor: 'rgba(0,0,0,0.12)',
               },
             ]}
           />
@@ -120,63 +214,63 @@ const StaticBoard = memo(function StaticBoard({
       )}
       {TRACK_CELLS.map((c, global) => {
         const owner = startColor.get(global);
+        const entry = entryColor.get(global);
+        const isSafe = safe.includes(global);
         const event = adventure?.cells.find(e => e.trackPosition === global);
         const polarity = event ? definitionFor(event.kind).polarity : null;
+        const star = owner || isSafe;
         return (
-          <View
+          <Bevel
             key={`track-${global}`}
-            accessible={false}
-            style={[
-              styles.abs,
-              styles.cell,
-              {
-                left: c.col * cell,
-                top: c.row * cell,
-                width: cell,
-                height: cell,
-                backgroundColor: owner ? p.players[owner].main : p.boardCell,
-                borderColor: p.boardLine,
-              },
-            ]}>
-            {safe.includes(global) && !owner ? (
+            left={c.col * cell}
+            top={c.row * cell}
+            size={cell}
+            color={isSafe && !owner ? scene.safeCell : scene.stone.base}
+            light={scene.stone.light}
+            dark={scene.stone.dark}>
+            {star ? (
               <AppText
                 style={{
-                  fontSize: cell * 0.6,
-                  color: p.safeMark,
-                  lineHeight: cell * 0.9,
+                  fontSize: cell * 0.62,
+                  lineHeight: cell * 0.8,
+                  color: owner ? p.players[owner].main : '#FFFFFF',
                 }}>
                 ★
               </AppText>
-            ) : null}
-            {event ? (
+            ) : entry ? (
+              <AppText
+                style={{
+                  fontSize: cell * 0.6,
+                  lineHeight: cell * 0.8,
+                  fontWeight: '900',
+                  color: p.players[entry].main,
+                  transform: [{rotate: ARROW_ROTATION[entry]}],
+                }}>
+                ❯
+              </AppText>
+            ) : event ? (
               <AppText
                 style={{
                   fontSize: cell * 0.55,
-                  lineHeight: cell * 0.9,
+                  lineHeight: cell * 0.8,
                   color: polarity === 'positive' ? '#2E7D32' : '#C62828',
                 }}>
                 {ADVENTURE_GLYPH[event.kind]}
               </AppText>
             ) : null}
-          </View>
+          </Bevel>
         );
       })}
       {PLAYER_COLORS.flatMap(color =>
         FINAL_LANE_CELLS[color].map((c, i) => (
-          <View
+          <Bevel
             key={`lane-${color}-${i}`}
-            style={[
-              styles.abs,
-              styles.cell,
-              {
-                left: c.col * cell,
-                top: c.row * cell,
-                width: cell,
-                height: cell,
-                backgroundColor: p.players[color].main,
-                borderColor: p.boardLine,
-              },
-            ]}
+            left={c.col * cell}
+            top={c.row * cell}
+            size={cell}
+            color={p.players[color].main}
+            light={p.players[color].light}
+            dark={p.players[color].dark}
           />
         ))
       )}
@@ -261,8 +355,12 @@ export function LudoBoard({
   animations,
   characterGlyph,
   reduceMotion,
+  playerLabels = {},
 }: LudoBoardProps) {
-  const cell = size / GRID_SIZE;
+  const scene = sceneryFor(theme);
+  const frame = Math.max(4, size * 0.02);
+  const inner = size - frame * 2;
+  const cell = inner / GRID_SIZE;
 
   // Group pawns by drawn point to offset stacked pawns slightly.
   const pawns = useMemo(() => {
@@ -298,49 +396,89 @@ export function LudoBoard({
   return (
     <View
       style={[
-        styles.board,
-        {width: size, height: size, backgroundColor: theme.palette.boardFrame},
+        styles.frame,
+        {
+          width: size,
+          height: size,
+          padding: frame,
+          backgroundColor: scene.frame.wood,
+          borderColor: scene.frame.trim,
+          borderRadius: frame * 2,
+        },
       ]}
       accessibilityLabel="Plateau de Ludo">
-      <StaticBoard
-        theme={theme}
-        cell={cell}
-        safe={state.config.rules.safeTrackPositions}
-        adventure={state.config.adventure}
-      />
-      {pawns.map(p => {
-        const key = pawnKey(p.color, p.index);
-        const offset = p.stackIndex * cell * 0.18;
-        return (
-          <Pawn
-            key={key}
-            color={theme.palette.players[p.color]}
-            glyph={characterGlyph(p.color)}
-            cell={cell}
-            x={p.x + offset / cell}
-            y={p.y - offset / cell}
-            animation={animations.get(key) ?? null}
-            movable={movable.has(key)}
-            shielded={state.shields[p.color][p.index] ?? false}
-            reduceMotion={reduceMotion}
-            accessibilityLabel={`Pion ${p.color} ${p.index + 1}, position ${p.position}`}
-            onPress={() => onPawnPress(p.color, p.index)}
-          />
-        );
-      })}
+      <View
+        style={[
+          styles.boardInner,
+          {width: inner, height: inner, borderRadius: frame},
+        ]}>
+        <StaticBoard
+          theme={theme}
+          cell={cell}
+          safe={state.config.rules.safeTrackPositions}
+          adventure={state.config.adventure}
+          labels={playerLabels}
+        />
+      </View>
+      <View
+        style={[
+          styles.abs,
+          {left: frame, top: frame, width: inner, height: inner},
+        ]}
+        pointerEvents="box-none">
+        {pawns.map(p => {
+          const key = pawnKey(p.color, p.index);
+          const offset = p.stackIndex * cell * 0.18;
+          return (
+            <Pawn
+              key={key}
+              color={theme.palette.players[p.color]}
+              glyph={characterGlyph(p.color)}
+              cell={cell}
+              sizeScale={p.position === -1 ? 1.3 : 1}
+              x={p.x + offset / cell}
+              y={p.y - offset / cell}
+              animation={animations.get(key) ?? null}
+              movable={movable.has(key)}
+              shielded={state.shields[p.color][p.index] ?? false}
+              reduceMotion={reduceMotion}
+              accessibilityLabel={`Pion ${p.color} ${p.index + 1}, position ${p.position}`}
+              onPress={() => onPawnPress(p.color, p.index)}
+            />
+          );
+        })}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  board: {borderRadius: 10, overflow: 'hidden'},
+  frame: {
+    borderWidth: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    shadowOffset: {width: 0, height: 6},
+    elevation: 10,
+  },
+  boardInner: {overflow: 'hidden'},
   abs: {position: 'absolute'},
-  baseInner: {flex: 1, borderWidth: 3},
-  slot: {borderWidth: 1, borderColor: 'rgba(0,0,0,0.25)'},
-  cell: {
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
+  center: {alignItems: 'center', justifyContent: 'center'},
+  disc: {
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    shadowOffset: {width: 0, height: 3},
+    elevation: 4,
+  },
+  quadLabel: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowRadius: 3,
+    textShadowOffset: {width: 0, height: 1},
   },
   tri: {width: 0, height: 0, borderColor: 'transparent'},
 });

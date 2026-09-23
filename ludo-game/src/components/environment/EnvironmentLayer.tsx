@@ -8,6 +8,8 @@ import type {
   EnvironmentDefinition,
   GraphicsQuality,
 } from '../../environment/types.ts';
+import type {SceneryDefinition} from '../../themes/types.ts';
+import {Scenery} from './Scenery.tsx';
 
 function Particle({
   p,
@@ -35,6 +37,7 @@ function Particle({
     };
   }, [p.durationMs, p.delayMs, progress]);
 
+  const leafy = p.shape === 'petal' || p.shape === 'leaf';
   const startX = p.startX * width;
   const startY =
     p.direction === 'down'
@@ -48,11 +51,20 @@ function Particle({
       : p.direction === 'up'
         ? -p.size
         : startY;
+  const x0 = p.direction === 'across' ? -p.size : startX;
   const endX =
     p.direction === 'across' ? width + p.size : startX + p.driftX * width;
+  // Wind: drift plus a gentle side-to-side sway for petals and leaves.
+  const swing = leafy ? p.size * 3 : 0;
   const translateX = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [p.direction === 'across' ? -p.size : startX, endX],
+    inputRange: [0, 0.25, 0.5, 0.75, 1],
+    outputRange: [
+      x0,
+      x0 + (endX - x0) * 0.25 + swing,
+      x0 + (endX - x0) * 0.5,
+      x0 + (endX - x0) * 0.75 - swing,
+      endX,
+    ],
   });
   const translateY = progress.interpolate({
     inputRange: [0, 1],
@@ -60,44 +72,45 @@ function Particle({
   });
   const rotate = progress.interpolate({
     inputRange: [0, 1],
-    outputRange: [
-      '0deg',
-      p.shape === 'petal' || p.shape === 'leaf' ? '540deg' : '0deg',
-    ],
+    outputRange: ['0deg', leafy ? '540deg' : '0deg'],
   });
-  const borderRadius =
-    p.shape === 'petal' || p.shape === 'leaf' ? p.size * 0.6 : p.size / 2;
+  const flip = progress.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [1, leafy ? 0.3 : 1, 1],
+  });
   return (
     <Animated.View
       style={[
         styles.particle,
         {
           width: p.size,
-          height:
-            p.shape === 'petal' || p.shape === 'leaf' ? p.size * 0.65 : p.size,
-          borderRadius,
+          height: leafy ? p.size * 0.65 : p.size,
+          borderRadius: leafy ? p.size * 0.6 : p.size / 2,
+          borderTopLeftRadius: leafy ? p.size * 0.1 : p.size / 2,
           backgroundColor: p.color,
           opacity: p.opacity,
-          transform: [{translateX}, {translateY}, {rotate}],
+          transform: [{translateX}, {translateY}, {rotate}, {scaleX: flip}],
         },
       ]}
     />
   );
 }
 
-/** Subtle animated environment. Purely visual: it never touches the game state. */
+/** Animated environment. Purely visual: it never touches the game state. */
 export const EnvironmentLayer = memo(function EnvironmentLayer({
   environment,
   quality,
   reduceMotion,
   width,
   height,
+  scenery,
 }: {
   readonly environment: EnvironmentDefinition;
   readonly quality: GraphicsQuality;
   readonly reduceMotion: boolean;
   readonly width: number;
   readonly height: number;
+  readonly scenery?: SceneryDefinition;
 }) {
   const particles = useMemo(
     () => planParticles(environment, quality, {reduceMotion}),
@@ -110,9 +123,13 @@ export const EnvironmentLayer = memo(function EnvironmentLayer({
         StyleSheet.absoluteFill,
         {backgroundColor: environment.skyGradient[1]},
       ]}>
-      <View
-        style={[styles.sky, {backgroundColor: environment.skyGradient[0]}]}
-      />
+      {scenery ? (
+        <Scenery scenery={scenery} width={width} height={height} />
+      ) : (
+        <View
+          style={[styles.sky, {backgroundColor: environment.skyGradient[0]}]}
+        />
+      )}
       {particles.map(p => (
         <Particle key={p.key} p={p} width={width} height={height} />
       ))}

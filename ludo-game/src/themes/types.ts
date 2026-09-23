@@ -42,3 +42,30 @@ export interface ThemeDefinition {
   readonly boardArt: AssetRef;
   readonly music: AssetRef;
 }
+
+/**
+ * Visual style of the board and of the code-drawn scenery. Purely cosmetic:
+ * nothing here is read by the engine. Painted illustrations will replace the
+ * code-drawn landmark when the assets listed in docs/ASSETS.md are delivered.
+ */
+export interface SceneryDefinition {
+  /** Sky gradient, top to horizon. */
+  readonly sky: readonly [string, string, string];
+  readonly sun: string | null;
+  /** Code-drawn landmark silhouette (placeholder for the painted bg_mid). */
+  readonly landmark: 'fuji' | null;
+  readonly hills: string;
+  readonly water: string | null;
+  readonly frame: {readonly wood: string; readonly trim: string};
+  readonly stone: {
+    readonly base: string;
+    readonly light: string;
+    readonly dark: string;
+  };
+  readonly safeCell: string;
+  readonly marble: {
+    readonly base: string;
+    readonly light: string;
+    readonly ring: string;
+  };
+}

@@ -1,19 +1,21 @@
 import {useState, type ReactNode} from 'react';
-import {StyleSheet, useWindowDimensions, View} from 'react-native';
+import {Pressable, StyleSheet, useWindowDimensions, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {CLASSIC_PAWN_ID, getCharacter} from '../../content/characters.ts';
 import {getDice} from '../../content/dice.ts';
 import {getEnvironment} from '../../environment/environments.ts';
 import type {DieValue, GameState, PlayerColor} from '../../game/types.ts';
 import {useSettings} from '../../state/settings.tsx';
+import {useProfile} from '../../state/profile.tsx';
+import {sceneryFor} from '../../themes/scenery.ts';
 import {LudoBoard} from '../board/LudoBoard.tsx';
 import type {PawnAnimation} from '../board/Pawn.tsx';
 import {Dice} from '../dice/Dice.tsx';
 import {EnvironmentLayer} from '../environment/EnvironmentLayer.tsx';
 import {AppText} from '../ui/AppText.tsx';
-import {Button} from '../ui/Button.tsx';
+import {router} from 'expo-router';
 import {useActiveTheme} from '../ui/theme.ts';
-import {PlayersBar} from './PlayersBar.tsx';
+import {PlayerCard} from './PlayerCard.tsx';
 import {FinalRanking, FinishedPrompt} from './ResultModal.tsx';
 
 export interface GameViewModel {
@@ -49,7 +51,7 @@ export function GameView({
   const {settings} = useSettings();
   const {width, height} = useWindowDimensions();
   const [dismissedFinal, setDismissedFinal] = useState(false);
-  const boardSize = Math.min(width - 12, height * 0.58);
+  const boardSize = Math.min(width - 8, height * 0.56);
   const {state} = game;
   const current = state.players.find(p => p.color === state.currentColor);
   const humanCharacter = getCharacter(settings.equippedCharacterId);
@@ -79,6 +81,17 @@ export function GameView({
             ? `${current?.displayName ?? ''} : choisissez un pion (${game.dice.value ?? ''})`
             : `Au tour de ${current?.displayName ?? ''}`;
 
+  const {profile} = useProfile();
+  const cardSize = Math.min(64, width * 0.15);
+  const labels = Object.fromEntries(
+    state.players.map(p => [p.color, p.displayName])
+  );
+  const Pill = ({icon, value}: {icon: string; value: string}) => (
+    <View style={[styles.pill, {borderColor: theme.palette.surfaceAlt}]}>
+      <AppText variant="label">{icon}</AppText>
+      <AppText variant="label">{value}</AppText>
+    </View>
+  );
   return (
     <View style={styles.root}>
       <EnvironmentLayer
@@ -87,10 +100,35 @@ export function GameView({
         reduceMotion={settings.reduceMotion}
         width={width}
         height={height}
+        scenery={sceneryFor(theme)}
       />
       <SafeAreaView style={styles.safe}>
-        <View style={styles.header}>
-          <Button label="Quitter" variant="ghost" onPress={game.onQuit} />
+        <View style={styles.topBar}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Quitter la partie"
+            onPress={game.onQuit}
+            style={styles.iconBtn}>
+            <AppText variant="heading">☰</AppText>
+          </Pressable>
+          <Pill icon="🪙" value={profile ? String(profile.coins) : '—'} />
+          <Pill icon="💎" value={profile ? String(profile.gems) : '—'} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Paramètres"
+            onPress={() => router.push('/settings')}
+            style={styles.iconBtn}>
+            <AppText variant="heading">⚙</AppText>
+          </Pressable>
+        </View>
+        <View style={styles.flex} />
+        <View style={styles.cornerRow}>
+          <PlayerCard
+            state={state}
+            color="green"
+            theme={theme}
+            size={cardSize}
+          />
           <View style={styles.flex}>
             {state.duel ? (
               <AppText variant="heading" color="#FFD54F" style={styles.center}>
@@ -102,14 +140,18 @@ export function GameView({
               </AppText>
             ) : null}
             {state.config.adventure ? (
-              <AppText variant="caption" muted style={styles.center}>
+              <AppText variant="caption" style={styles.center}>
                 Adventure · {state.config.adventure.seed}
               </AppText>
             ) : null}
           </View>
+          <PlayerCard
+            state={state}
+            color="yellow"
+            theme={theme}
+            size={cardSize}
+          />
         </View>
-        {banner}
-        <PlayersBar state={state} theme={theme} />
         <View style={styles.boardWrap}>
           <LudoBoard
             state={state}
@@ -120,35 +162,56 @@ export function GameView({
             animations={game.animations}
             characterGlyph={glyph}
             reduceMotion={settings.reduceMotion}
+            playerLabels={labels}
+          />
+        </View>
+        <View style={styles.cornerRow}>
+          <PlayerCard state={state} color="red" theme={theme} size={cardSize} />
+          <View
+            style={[
+              styles.diceBox,
+              {
+                backgroundColor: theme.palette.surface,
+                borderColor: sceneryFor(theme).frame.trim,
+              },
+            ]}>
+            <Dice
+              definition={diceDefinition}
+              value={game.dice.value}
+              rollId={game.dice.rollId}
+              size={52}
+              canRoll={game.canRoll}
+              reduceMotion={settings.reduceMotion}
+              onPress={game.roll}
+              onRollEnd={game.onDiceAnimationEnd}
+            />
+          </View>
+          <PlayerCard
+            state={state}
+            color="blue"
+            theme={theme}
+            size={cardSize}
           />
         </View>
         <View
-          style={[styles.controls, {backgroundColor: theme.palette.surface}]}>
-          <Dice
-            definition={diceDefinition}
-            value={game.dice.value}
-            rollId={game.dice.rollId}
-            size={56}
-            canRoll={game.canRoll}
-            reduceMotion={settings.reduceMotion}
-            onPress={game.roll}
-            onRollEnd={game.onDiceAnimationEnd}
-          />
-          <View style={styles.flex}>
-            <AppText variant="label" accessibilityLiveRegion="polite">
-              {turnText}
+          style={[styles.infoBar, {backgroundColor: theme.palette.surface}]}>
+          <AppText
+            variant="label"
+            accessibilityLiveRegion="polite"
+            numberOfLines={1}>
+            {turnText}
+          </AppText>
+          {game.log.slice(0, 2).map((line, i) => (
+            <AppText
+              key={`${i}-${line}`}
+              variant="caption"
+              muted
+              numberOfLines={1}>
+              {line}
             </AppText>
-            {game.log.slice(0, 3).map((line, i) => (
-              <AppText
-                key={`${i}-${line}`}
-                variant="caption"
-                muted
-                numberOfLines={1}>
-                {line}
-              </AppText>
-            ))}
-          </View>
+          ))}
         </View>
+        {banner}
       </SafeAreaView>
       {game.finishedPrompt ? (
         <FinishedPrompt
@@ -172,16 +235,48 @@ export function GameView({
 
 const styles = StyleSheet.create({
   root: {flex: 1},
-  safe: {flex: 1, paddingHorizontal: 6, gap: 8},
-  header: {flexDirection: 'row', alignItems: 'center', gap: 8},
+  safe: {flex: 1, paddingHorizontal: 4, gap: 6},
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingHorizontal: 4,
+  },
+  iconBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(20,20,40,0.75)',
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    backgroundColor: 'rgba(20,20,40,0.75)',
+    minWidth: 90,
+    justifyContent: 'center',
+  },
+  cornerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+  },
   flex: {flex: 1},
   center: {textAlign: 'center'},
   boardWrap: {alignItems: 'center'},
-  controls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 10,
-    borderRadius: 14,
+  diceBox: {borderRadius: 14, borderWidth: 2, padding: 6},
+  infoBar: {
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    opacity: 0.92,
   },
 });

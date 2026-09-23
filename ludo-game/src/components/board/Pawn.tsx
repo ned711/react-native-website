@@ -1,5 +1,6 @@
 import {useEffect, useRef} from 'react';
-import {Animated, Easing, Pressable, StyleSheet} from 'react-native';
+import {LinearGradient} from 'expo-linear-gradient';
+import {Animated, Easing, Pressable, StyleSheet, View} from 'react-native';
 import type {GridPoint} from '../../game/board/layout.ts';
 import type {ColorSet} from '../../themes/types.ts';
 import {AppText} from '../ui/AppText.tsx';
@@ -18,6 +19,8 @@ export interface PawnProps {
   readonly color: ColorSet;
   readonly glyph: string;
   readonly cell: number;
+  /** Visual size multiplier (bigger pawns at home). Does not affect positions. */
+  readonly sizeScale?: number;
   readonly x: number;
   readonly y: number;
   readonly animation: PawnAnimation | null;
@@ -32,6 +35,7 @@ export function Pawn({
   color,
   glyph,
   cell,
+  sizeScale = 1,
   x,
   y,
   animation,
@@ -41,7 +45,7 @@ export function Pawn({
   accessibilityLabel,
   onPress,
 }: PawnProps) {
-  const size = cell * 0.78;
+  const size = cell * 0.86 * sizeScale;
   const pos = useRef(
     new Animated.ValueXY({x: x * cell - size / 2, y: y * cell - size / 2})
   ).current;
@@ -121,31 +125,157 @@ export function Pawn({
         disabled={!movable}
         onPress={onPress}
         hitSlop={cell * 0.2}
-        style={[
-          styles.pawn,
-          {
-            borderRadius: size / 2,
-            backgroundColor: color.main,
-            borderColor: movable ? '#FFFFFF' : color.dark,
-            borderWidth: movable ? 3 : 2,
-          },
-          shielded && styles.shield,
-        ]}>
-        <AppText
-          style={{
-            fontSize: size * 0.42,
-            lineHeight: size * 0.6,
-            color: '#FFFFFF',
-          }}>
-          {glyph}
-        </AppText>
+        style={styles.pawn}>
+        <PawnFigure
+          size={size}
+          color={color}
+          glyph={glyph}
+          highlighted={movable}
+          shielded={shielded}
+        />
       </Pressable>
     </Animated.View>
   );
 }
 
+/**
+ * Pawn drawn in relief with plain views (base, body, head, highlights). The
+ * figure is taller than its cell box: the head overflows upwards like a real
+ * piece seen from above at an angle.
+ */
+export function PawnFigure({
+  size,
+  color,
+  glyph,
+  highlighted,
+  shielded,
+}: {
+  readonly size: number;
+  readonly color: ColorSet;
+  readonly glyph: string;
+  readonly highlighted: boolean;
+  readonly shielded: boolean;
+}) {
+  const head = size * 0.46;
+  const bodyW = size * 0.5;
+  const bodyH = size * 0.55;
+  const baseW = size * 0.84;
+  const baseH = size * 0.34;
+  return (
+    <View
+      style={[styles.figure, {width: size, height: size}]}
+      pointerEvents="none">
+      <View
+        style={[
+          styles.part,
+          {
+            width: size * 0.95,
+            height: size * 0.34,
+            bottom: -size * 0.06,
+            left: size * 0.025,
+            borderRadius: size,
+            backgroundColor: 'rgba(0,0,0,0.35)',
+          },
+        ]}
+      />
+      {highlighted || shielded ? (
+        <View
+          style={[
+            styles.part,
+            {
+              width: baseW + size * 0.2,
+              height: baseH + size * 0.14,
+              bottom: -size * 0.04,
+              left: (size - baseW) / 2 - size * 0.1,
+              borderRadius: size,
+              borderWidth: Math.max(2, size * 0.07),
+              borderColor: shielded ? '#80D8FF' : '#FFE082',
+            },
+          ]}
+        />
+      ) : null}
+      <LinearGradient
+        colors={[color.light, color.main, color.dark]}
+        start={{x: 0, y: 0}}
+        end={{x: 1, y: 1}}
+        style={[
+          styles.part,
+          {
+            width: baseW,
+            height: baseH,
+            bottom: 0,
+            left: (size - baseW) / 2,
+            borderRadius: size,
+          },
+        ]}
+      />
+      <LinearGradient
+        colors={[color.light, color.main, color.dark]}
+        locations={[0, 0.4, 1]}
+        start={{x: 0, y: 0.5}}
+        end={{x: 1, y: 0.5}}
+        style={[
+          styles.part,
+          {
+            width: bodyW,
+            height: bodyH,
+            bottom: baseH * 0.45,
+            left: (size - bodyW) / 2,
+            borderTopLeftRadius: bodyW * 0.45,
+            borderTopRightRadius: bodyW * 0.45,
+            borderBottomLeftRadius: bodyW * 0.2,
+            borderBottomRightRadius: bodyW * 0.2,
+          },
+        ]}
+      />
+      <LinearGradient
+        colors={[color.light, color.main, color.dark]}
+        locations={[0, 0.45, 1]}
+        start={{x: 0.2, y: 0.1}}
+        end={{x: 0.9, y: 0.9}}
+        style={[
+          styles.part,
+          styles.center,
+          {
+            width: head,
+            height: head,
+            bottom: baseH * 0.45 + bodyH - head * 0.35,
+            left: (size - head) / 2,
+            borderRadius: head / 2,
+          },
+        ]}>
+        {glyph ? (
+          <AppText
+            style={{
+              fontSize: head * 0.55,
+              lineHeight: head * 0.8,
+              color: '#FFFFFF',
+            }}>
+            {glyph}
+          </AppText>
+        ) : null}
+      </LinearGradient>
+      <View
+        style={[
+          styles.part,
+          {
+            width: head * 0.28,
+            height: head * 0.22,
+            bottom: baseH * 0.45 + bodyH + head * 0.28,
+            left: size / 2 - head * 0.26,
+            borderRadius: head,
+            backgroundColor: 'rgba(255,255,255,0.75)',
+          },
+        ]}
+      />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   abs: {position: 'absolute', left: 0, top: 0},
-  pawn: {flex: 1, alignItems: 'center', justifyContent: 'center', elevation: 4},
-  shield: {shadowColor: '#80D8FF', shadowOpacity: 0.9, shadowRadius: 6},
+  pawn: {flex: 1},
+  figure: {position: 'relative'},
+  part: {position: 'absolute'},
+  center: {alignItems: 'center', justifyContent: 'center'},
 });

@@ -44,13 +44,13 @@ export const ENVIRONMENTS: readonly EnvironmentDefinition[] = [
     [
       {
         shape: 'petal',
-        colors: ['#F8BBD0', '#F48FB1', '#FCE4EC'],
-        sizeRange: [6, 11],
-        durationRange: [9, 15],
-        drift: 0.25,
+        colors: ['#F8BBD0', '#F48FB1', '#FCE4EC', '#FFFFFF'],
+        sizeRange: [11, 19],
+        durationRange: [8, 14],
+        drift: 0.45,
         direction: 'down',
-        opacity: 0.8,
-        countByQuality: count(0, 8, 16),
+        opacity: 0.9,
+        countByQuality: count(0, 14, 28),
       },
       {
         shape: 'mist',
