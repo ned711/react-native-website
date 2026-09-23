@@ -39,3 +39,19 @@ describe('chat log', () => {
     expect(toChatMessage(null)).toBeNull();
   });
 });
+
+describe('server inventory mapping', async () => {
+  const {inventoryFromRows} = await import('../../src/services/profile.ts');
+  it('maps rows and never trusts unknown shapes', () => {
+    expect(
+      inventoryFromRows([
+        {item_id: 'samurai', fragments: 6, unlocked: true, source: 'chest'},
+        {item_id: 'ninja', fragments: '4', unlocked: false, source: 'weird'},
+        null,
+      ])
+    ).toEqual([
+      {itemId: 'samurai', fragments: 6, unlocked: true, source: 'chest'},
+      {itemId: 'ninja', fragments: 4, unlocked: false, source: 'chest'},
+    ]);
+  });
+});

@@ -9,6 +9,17 @@ import {GOLD, useActiveTheme} from '../../components/ui/theme.ts';
 import {getCharacter} from '../../content/characters.ts';
 import {backendStatus} from '../../services/backend.ts';
 import {useSettings} from '../../state/settings.tsx';
+import {useProfile} from '../../state/profile.tsx';
+import {badgeForLevel} from '../../progression/badges.ts';
+import {levelFromXp} from '../../progression/levels.ts';
+import {formatTag} from '../../social/friends/tag.ts';
+
+function xpLine(xp: number): string {
+  const p = levelFromXp(xp);
+  return p.xpForNextLevel === null
+    ? `${xp} XP`
+    : `${p.xpIntoLevel}/${p.xpForNextLevel} XP`;
+}
 
 const SECTIONS: readonly {label: string; href: Href; glyph: string}[] = [
   {label: 'Jouer', href: '/play', glyph: '▶'},
@@ -24,6 +35,7 @@ export default function HomeScreen() {
   const theme = useActiveTheme();
   const {settings} = useSettings();
   const backend = backendStatus();
+  const {profile} = useProfile();
   const character = getCharacter(settings.equippedCharacterId);
   return (
     <Screen>
@@ -42,12 +54,30 @@ export default function HomeScreen() {
           </AppText>
         </Pressable>
         <View style={styles.flex}>
-          <AppText variant="label">Invité</AppText>
-          <AppText variant="caption" muted>
-            {backend.configured
-              ? 'Connectez-vous pour votre progression'
-              : 'Hors ligne · progression non synchronisée'}
-          </AppText>
+          {profile ? (
+            <>
+              <AppText variant="label">
+                {formatTag({
+                  username: profile.username,
+                  discriminator: profile.discriminator,
+                })}
+              </AppText>
+              <AppText variant="caption" muted>
+                {badgeForLevel(profile.level).label} · Niv. {profile.level} ·{' '}
+                {xpLine(profile.xp)} · {profile.coins} pièces · {profile.gems}{' '}
+                gemmes
+              </AppText>
+            </>
+          ) : (
+            <>
+              <AppText variant="label">Invité</AppText>
+              <AppText variant="caption" muted>
+                {backend.configured
+                  ? 'Connectez-vous pour votre progression'
+                  : 'Hors ligne · progression non synchronisée'}
+              </AppText>
+            </>
+          )}
         </View>
         <Pressable
           accessibilityRole="button"

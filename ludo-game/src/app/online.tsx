@@ -1,4 +1,4 @@
-import {router} from 'expo-router';
+import {router, useLocalSearchParams} from 'expo-router';
 import {useCallback, useEffect, useState} from 'react';
 import {StyleSheet, TextInput, View} from 'react-native';
 import {AppText} from '../components/ui/AppText.tsx';
@@ -22,6 +22,8 @@ import {
   ticketMatch,
   type RoomView,
 } from '../services/lobby.ts';
+import {listFriends, type FriendRow} from '../services/rpc.ts';
+import {sendInvitation} from '../services/social.ts';
 import {useAuth} from '../state/auth.tsx';
 
 const FORMATS: readonly {value: MatchFormat; label: string}[] = [
@@ -41,7 +43,11 @@ export default function OnlineLobbyScreen() {
   const theme = useActiveTheme();
   const [format, setFormat] = useState<MatchFormat>('4p');
   const [code, setCode] = useState('');
-  const [roomId, setRoomId] = useState<string | null>(null);
+  const params = useLocalSearchParams<{roomId?: string}>();
+  const [roomId, setRoomId] = useState<string | null>(
+    typeof params.roomId === 'string' ? params.roomId : null
+  );
+  const [friends, setFriends] = useState<FriendRow[]>([]);
   const [room, setRoom] = useState<RoomView | null>(null);
   const [ticket, setTicket] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -59,6 +65,11 @@ export default function OnlineLobbyScreen() {
       if (matchId) openMatch(matchId);
     }
   }, [roomId, ticket]);
+
+  useEffect(() => {
+    if (!roomId || !session) return;
+    listFriends().then(r => r.ok && setFriends(r.value));
+  }, [roomId, session]);
 
   useEffect(() => {
     if (!roomId && !ticket) return undefined;
@@ -133,6 +144,26 @@ export default function OnlineLobbyScreen() {
               En attente du lancement par le propriétaire…
             </AppText>
           )}
+          {room.status === 'open' && friends.length > 0 ? (
+            <>
+              <AppText variant="label">Inviter un ami</AppText>
+              {friends
+                .filter(f => !room.members.some(m => m.userId === f.userId))
+                .map(f => (
+                  <Button
+                    key={f.userId}
+                    variant="secondary"
+                    label={`Inviter ${f.username}#${f.discriminator}${f.online ? '' : ' (hors ligne)'}`}
+                    onPress={async () => {
+                      const r = await sendInvitation(f.userId, room.id);
+                      setMessage(
+                        r.ok ? `Invitation envoyée à ${f.username}` : r.error
+                      );
+                    }}
+                  />
+                ))}
+            </>
+          ) : null}
           <Button
             label="Quitter la salle"
             variant="secondary"

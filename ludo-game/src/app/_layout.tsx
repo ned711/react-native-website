@@ -3,6 +3,7 @@ import {StatusBar} from 'expo-status-bar';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {AuthProvider} from '../state/auth.tsx';
 import {LocalStatsProvider} from '../state/localStats.tsx';
+import {ProfileProvider} from '../state/profile.tsx';
 import {SettingsProvider} from '../state/settings.tsx';
 import {useActiveTheme} from '../components/ui/theme.ts';
 
@@ -43,9 +44,11 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <SettingsProvider>
         <AuthProvider>
-          <LocalStatsProvider>
-            <ThemedStack />
-          </LocalStatsProvider>
+          <ProfileProvider>
+            <LocalStatsProvider>
+              <ThemedStack />
+            </LocalStatsProvider>
+          </ProfileProvider>
         </AuthProvider>
       </SettingsProvider>
     </SafeAreaProvider>

@@ -4,12 +4,9 @@ import {Card} from '../../components/ui/Card.tsx';
 import {Screen} from '../../components/ui/Screen.tsx';
 import {StatusBadge} from '../../components/ui/StatusBadge.tsx';
 import {GOLD, useActiveTheme} from '../../components/ui/theme.ts';
-import {
-  collectionProgress,
-  defaultInventory,
-} from '../../inventory/inventory.ts';
+import {collectionProgress} from '../../inventory/inventory.ts';
 import type {ItemCategory} from '../../inventory/catalog.ts';
-import {backendStatus} from '../../services/backend.ts';
+import {useProfile} from '../../state/profile.tsx';
 import {THEMES} from '../../themes/themes.ts';
 
 const CATEGORY_LABEL: Partial<Record<ItemCategory, string>> = {
@@ -22,15 +19,14 @@ const CATEGORY_LABEL: Partial<Record<ItemCategory, string>> = {
 export default function CollectionScreen() {
   const theme = useActiveTheme();
   // Offline, only the default items are owned. Owned items come from the server inventory.
-  const inventory = defaultInventory();
-  const backend = backendStatus();
+  const {inventory, profile} = useProfile();
   return (
     <Screen title="Collection" subtitle="Progression par pays et par thème">
-      {!backend.configured ? (
+      {!profile ? (
         <Card>
           <StatusBadge status="NON CONFIGURÉ" />
           <AppText muted variant="caption">
-            L’inventaire est conservé sur le serveur. Hors ligne, seuls les
+            L’inventaire est conservé sur le serveur. Sans connexion, seuls les
             objets classiques par défaut sont affichés comme possédés.
           </AppText>
         </Card>
