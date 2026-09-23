@@ -385,6 +385,45 @@ describe.skipIf(!hasDatabase)(
       );
     });
 
+    it('matchmaking queue: a friend cannot be queued without sharing a room (consent)', async () => {
+      const a = await createUser(db, 'PartyA');
+      const b = await createUser(db, 'PartyB');
+      const tag = await db.pool.query<{
+        username: string;
+        discriminator: string;
+      }>(`select username, discriminator from public.profiles where id = $1`, [
+        b,
+      ]);
+      const req = await asUser(db, a, q =>
+        q<{id: string}>(`select public.send_friend_request($1, $2) as id`, [
+          tag.rows[0]?.username,
+          tag.rows[0]?.discriminator,
+        ])
+      );
+      await asUser(db, b, q =>
+        q(`select public.respond_friend_request($1, true)`, [req.rows[0]?.id])
+      );
+      await expectError(
+        asUser(db, a, q =>
+          q(`select public.enqueue_matchmaking('4p', array[$1]::uuid[])`, [b])
+        ),
+        'PARTY_MEMBER_NOT_IN_ROOM'
+      );
+      const room = await asUser(db, a, q =>
+        q<{code: string}>(`select * from public.create_room('4p')`)
+      );
+      await asUser(db, b, q =>
+        q(`select public.join_room($1)`, [room.rows[0]?.code])
+      );
+      const t = await asUser(db, a, q =>
+        q<{id: string}>(
+          `select public.enqueue_matchmaking('4p', array[$1]::uuid[]) as id`,
+          [b]
+        )
+      );
+      expect(t.rows[0]?.id).toBeTruthy();
+    });
+
     it('matchmaking queue: parties must be friends, no double queueing', async () => {
       const a = await createUser(db, 'QueueA');
       const b = await createUser(db, 'QueueB');
