@@ -1,5 +1,6 @@
 import {router, useLocalSearchParams} from 'expo-router';
 import {StyleSheet, View} from 'react-native';
+import {ChatPanel} from '../components/game/ChatPanel.tsx';
 import {GameView} from '../components/game/GameView.tsx';
 import {AppText} from '../components/ui/AppText.tsx';
 import {Button} from '../components/ui/Button.tsx';
@@ -39,10 +40,29 @@ function OnlineGame({
       </Screen>
     );
   }
+  const me = online.game.state.players.find(p => p.playerId === userId);
+  const canAbandon =
+    me?.status === 'active' && online.game.state.phase.kind !== 'finished';
   return (
     <GameView
       game={{...online.game, onQuit: () => router.back()}}
-      banner={banner}
+      banner={
+        <>
+          {banner}
+          <ChatPanel matchId={matchId} state={online.game.state} />
+          {canAbandon ? (
+            <Button
+              label="Abandonner la partie"
+              variant="ghost"
+              accessibilityHint="Votre siège quitte la partie ; celle-ci continue pour les autres"
+              onPress={async () => {
+                await online.leave();
+                router.back();
+              }}
+            />
+          ) : null}
+        </>
+      }
     />
   );
 }
