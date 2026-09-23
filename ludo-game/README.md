@@ -29,6 +29,22 @@ npm run export:android # bundle Metro/Hermes de vérification
 Le jeu hors ligne ne nécessite aucune configuration. Pour le multijoueur, voir
 [docs/SUPABASE.md](docs/SUPABASE.md). Architecture : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+## Builds mobiles (EAS)
+
+`eas.json` définit trois profils : `development` et `preview` (APK Android
+interne) et `production`. Non exécuté ici : il faut un compte Expo.
+
+```bash
+npx eas-cli@latest login
+npx eas-cli@latest build --profile preview --platform android
+```
+
+Au premier build, EAS demande l'identifiant Android (`android.package`) et iOS
+(`ios.bundleIdentifier`) : ce choix appartient au propriétaire de l'application
+et n'est volontairement pas fixé dans `app.json`. Les variables
+`EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` doivent être
+déclarées comme variables d'environnement EAS pour les builds.
+
 ## Stack
 
 Expo SDK 57, React Native 0.86, React 19.2, TypeScript 6 (strict,
@@ -84,8 +100,8 @@ scripts/          génération du SQL du catalogue depuis TypeScript
 | Backend SQL : profils, amis, blocage, invitations, chat, cadeaux, rooms, matchs, coffres, fragments, équipement, classements, file de matchmaking | PRÉPARÉ | testé sur PostgreSQL 16, pas sur Supabase |
 | Serveur autoritaire (Edge Function) | PRÉPARÉ | logique testée, `deno check` OK, non déployé |
 | Compte (connexion / inscription Supabase Auth) | PRÉPARÉ | non testé contre un projet réel |
-| Multijoueur en ligne dans l'app (salles, matchmaking, partie temps réel, reconnexion) | PRÉPARÉ | contrôleur client testé contre la vraie autorité (transport en mémoire) ; transport Supabase non exécuté contre un projet réel |
-| Amis, chat, cadeaux, coffre, classements, missions dans l'app | NON CONFIGURÉ | écrans prêts, nécessitent Supabase |
+| Multijoueur en ligne dans l'app (salles, invitations, matchmaking, partie temps réel, chat, abandon, reconnexion) | PRÉPARÉ | contrôleur client testé contre la vraie autorité (transport en mémoire) ; transport Supabase non exécuté contre un projet réel |
+| Profil serveur, inventaire, équipement, amis (demandes, blocage), coffre, classements, missions dans l'app | NON CONFIGURÉ | écrans branchés sur les RPC, nécessitent Supabase |
 | XP / niveaux / insignes | NON CONFIGURÉ | calcul testé, attribution serveur uniquement |
 | Worker de matchmaking | PRÉPARÉ | plan des sièges + création atomique SQL testés ; `MATCHMAKING_SWEEP` à planifier |
 | Missions / succès côté serveur | PRÉPARÉ | progression idempotente, réclamation, titres (SQL testé) |
