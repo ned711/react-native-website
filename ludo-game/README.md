@@ -83,10 +83,12 @@ scripts/          génération du SQL du catalogue depuis TypeScript
 | Accessibilité (texte agrandi, réduire animations, rôles/labels) | IMPLEMENTÉ | |
 | Backend SQL : profils, amis, blocage, invitations, chat, cadeaux, rooms, matchs, coffres, fragments, équipement, classements, file de matchmaking | PRÉPARÉ | testé sur PostgreSQL 16, pas sur Supabase |
 | Serveur autoritaire (Edge Function) | PRÉPARÉ | logique testée, `deno check` OK, non déployé |
-| Multijoueur en ligne dans l'app, amis, chat, cadeaux, coffre, classements | NON CONFIGURÉ | nécessite Supabase + écran de connexion (À FAIRE) |
+| Compte (connexion / inscription Supabase Auth) | PRÉPARÉ | non testé contre un projet réel |
+| Multijoueur en ligne dans l'app (salle d'attente, partie en ligne temps réel) | À FAIRE | le serveur existe ; le client temps réel reste à écrire |
+| Amis, chat, cadeaux, coffre, classements, missions dans l'app | NON CONFIGURÉ | écrans prêts, nécessitent Supabase |
 | XP / niveaux / insignes | NON CONFIGURÉ | calcul testé, attribution serveur uniquement |
-| Worker de matchmaking | À FAIRE | algorithme testé |
-| Missions / succès côté serveur | À FAIRE | logique testée |
+| Worker de matchmaking | PRÉPARÉ | plan des sièges + création atomique SQL testés ; `MATCHMAKING_SWEEP` à planifier |
+| Missions / succès côté serveur | PRÉPARÉ | progression idempotente, réclamation, titres (SQL testé) |
 | Boutique / paiements | NON CONFIGURÉ | aucun prix défini, aucun fournisseur |
 | Notifications push | NON CONFIGURÉ | notifications en base uniquement |
 | Saisons / événements | PRÉPARÉ | aucune saison programmée |
@@ -108,23 +110,23 @@ L'écran Paramètres > « État du projet » affiche le même tableau dans l'app
 
 ## Tests
 
-- 122 tests unitaires (plateau, mouvements, captures, tours, victoire/duel/2v2,
+- 125 tests unitaires (plateau, mouvements, captures, tours, victoire/duel/2v2,
   Adventure, IA sur 90 parties complètes à états gelés, replay, dé χ², autorité
   serveur, matchmaking, reconnexion, social, progression, contenu, présentation,
   session locale, absence de dérive du SQL généré).
-- 26 tests SQL sur PostgreSQL réel (RLS, droits, amis, blocage, invitations
+- 33 tests SQL sur PostgreSQL réel (RLS, droits, amis, blocage, invitations
   expirées, chat, limites de débit, coffres concurrents, fragments 6/6,
   équipement, rooms, CAS des actions, spectateurs, résultats idempotents,
-  classements, file de matchmaking) ; ignorés (et signalés comme tels) sans BD.
+  classements, file et worker de matchmaking, missions et succès) ; ignorés (et signalés comme tels) sans BD.
 - 1 test statistique de force de l'IA.
 
 ## Pour une version publiable
 
 1. Créer le projet Supabase, `db push`, déployer `match-action`, planifier
    `TIMEOUT_SWEEP` ; tester de bout en bout contre ce projet.
-2. Écran de connexion Supabase Auth et client temps réel dans l'app (rooms,
-   salle d'attente, partie en ligne, reconnexion branchée sur `planSync`).
-3. Worker de matchmaking ; suivi serveur des missions et succès.
+2. Client temps réel dans l'app (rooms, salle d'attente, partie en ligne,
+   reconnexion branchée sur `planSync`) ; tester l'écran de compte.
+3. Planifier `MATCHMAKING_SWEEP` et `TIMEOUT_SWEEP`.
 4. Assets licenciés : modèles 3D, animations, textures, musiques, effets ;
    remplacer les `PLACEHOLDER_ASSET` (aucun changement de logique requis).
 5. Prix, fournisseur de paiement et validation serveur des achats.

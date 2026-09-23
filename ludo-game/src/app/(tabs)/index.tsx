@@ -32,13 +32,15 @@ export default function HomeScreen() {
           styles.topBar,
           {backgroundColor: theme.palette.surface, borderColor: GOLD},
         ]}>
-        <View
-          style={[styles.avatar, {backgroundColor: theme.palette.accent}]}
-          accessibilityLabel="Avatar invité">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Compte"
+          onPress={() => router.push('/account')}
+          style={[styles.avatar, {backgroundColor: theme.palette.accent}]}>
           <AppText variant="heading" color="#FFFFFF">
             ?
           </AppText>
-        </View>
+        </Pressable>
         <View style={styles.flex}>
           <AppText variant="label">Invité</AppText>
           <AppText variant="caption" muted>

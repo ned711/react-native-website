@@ -1,4 +1,8 @@
+import {useCallback, useEffect, useState} from 'react';
 import {StyleSheet, View} from 'react-native';
+import {Button} from '../components/ui/Button.tsx';
+import {claimMission, myMissions, type MissionRow} from '../services/rpc.ts';
+import {useAuth} from '../state/auth.tsx';
 import {AppText} from '../components/ui/AppText.tsx';
 import {Card} from '../components/ui/Card.tsx';
 import {Screen} from '../components/ui/Screen.tsx';
@@ -12,15 +16,67 @@ const PERIOD: Readonly<Record<string, string>> = {
   event: 'Événement',
 };
 
+function ServerMissions() {
+  const [rows, setRows] = useState<MissionRow[]>([]);
+  const [message, setMessage] = useState<string | null>(null);
+  const load = useCallback(async () => {
+    const r = await myMissions();
+    if (r.ok) setRows(r.value);
+    else setMessage(r.error.message);
+  }, []);
+  useEffect(() => {
+    void load();
+  }, [load]);
+  return (
+    <>
+      <StatusBadge status="PRÉPARÉ" />
+      {message ? <AppText variant="caption">{message}</AppText> : null}
+      {rows.map(m => (
+        <Card key={m.missionId}>
+          <View style={styles.row}>
+            <AppText style={styles.flex}>{m.label}</AppText>
+            <AppText variant="caption" muted>
+              {m.progress}/{m.target}
+            </AppText>
+          </View>
+          {m.completed && !m.claimed ? (
+            <Button
+              label="Récupérer"
+              onPress={async () => {
+                const r = await claimMission(m.missionId);
+                if (!r.ok) setMessage(r.error.message);
+                void load();
+              }}
+            />
+          ) : null}
+          {m.claimed ? (
+            <AppText variant="caption" muted>
+              Récompense récupérée
+            </AppText>
+          ) : null}
+        </Card>
+      ))}
+    </>
+  );
+}
+
 export default function MissionsScreen() {
+  const {session} = useAuth();
+  if (session) {
+    return (
+      <Screen title="Missions et succès">
+        <ServerMissions />
+      </Screen>
+    );
+  }
   return (
     <Screen title="Missions et succès">
       <Card>
-        <StatusBadge status="PRÉPARÉ" />
+        <StatusBadge status="NON CONFIGURÉ" />
         <AppText muted variant="caption">
-          Définitions et calcul de progression implémentés et testés. Le suivi
-          et l’attribution des récompenses côté serveur restent à faire : aucune
-          progression n’est affichée pour ne rien simuler.
+          La progression est suivie et récompensée par le serveur (Supabase) :
+          connectez-vous pour la voir. Aucune progression n’est simulée hors
+          ligne. Missions disponibles :
         </AppText>
       </Card>
       {MISSIONS.map(m => (

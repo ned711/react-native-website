@@ -141,3 +141,35 @@ export const supabaseRankingService: RankingService = {
     return first ? toEntry(first) : null;
   },
 };
+
+export interface MissionRow {
+  readonly missionId: string;
+  readonly label: string;
+  readonly target: number;
+  readonly progress: number;
+  readonly completed: boolean;
+  readonly claimed: boolean;
+}
+
+export async function myMissions(): Promise<Result<MissionRow[], RpcError>> {
+  const r = await call('my_missions');
+  if (!r.ok) return r;
+  if (!Array.isArray(r.value))
+    return err({code: 'SERVER', message: 'réponse inattendue'});
+  return ok(
+    r.value.filter(isRecord).map(row => ({
+      missionId: String(row['mission_id']),
+      label: String(row['label']),
+      target: Number(row['target']),
+      progress: Number(row['progress']),
+      completed: row['completed'] === true,
+      claimed: row['claimed'] === true,
+    }))
+  );
+}
+
+export async function claimMission(
+  missionId: string
+): Promise<Result<unknown, RpcError>> {
+  return call('claim_mission', {p_mission: missionId});
+}

@@ -4,6 +4,7 @@
 //   {type: 'ROLL_DICE' | 'MOVE_PAWN' | 'LEAVE_MATCH' | 'SYNC', matchId, ...}
 //   {type: 'START_MATCH', roomId}
 //   {type: 'TIMEOUT_SWEEP'}            (scheduler only, service-role bearer)
+//   {type: 'MATCHMAKING_SWEEP'}        (scheduler only, service-role bearer)
 //
 // Clients send intents; dice are drawn here with a CSPRNG; every action goes
 // through the pure engine and is committed with compare-and-swap.
@@ -26,6 +27,13 @@ import {
 import type {EndGameMode, GameState} from '../../../src/game/types.ts';
 import {createCryptoRandom} from '../../../src/utils/random.ts';
 import {SupabaseMatchStore} from '../_shared/supabaseMatchStore.ts';
+import {statsFromEvents} from '../../../src/progression/stats.ts';
+import type {GameEvent} from '../../../src/game/events/types.ts';
+import {
+  runMatchmaking,
+  type QueueTicket,
+} from '../../../src/multiplayer/matchmaking/matchmaker.ts';
+import {planSeats} from '../../../src/multiplayer/matchmaking/plan.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
@@ -112,6 +120,98 @@ async function finalizeIfFinished(
     p_results: results,
   });
   if (applyError) throw new Error(`apply results failed: ${applyError.code}`);
+
+  // Missions / achievements progression, from the stored action log.
+  const {data: log, error: logError} = await service
+    .from('game_events')
+    .select('events')
+    .eq('match_id', matchId)
+    .order('seq');
+  if (logError) throw new Error(`load events failed: ${logError.code}`);
+  const events = (log ?? []).flatMap(row => row.events as GameEvent[]);
+  for (const result of results) {
+    const stats = statsFromEvents(events, result.color, {
+      playedWithFriend: withFriend.has(result.user_id),
+    });
+    const {error: progressError} = await service.rpc('record_match_progress', {
+      p_match: matchId,
+      p_user: result.user_id,
+      p_stats: {
+        wins: stats.wins,
+        captures: stats.captures,
+        matchesCompleted: stats.matchesCompleted,
+        pawnsSpawned: stats.pawnsSpawned,
+        pawnsFinished: stats.pawnsFinished,
+        matchesWithFriend:
+          stats.playedWithFriend && stats.matchesCompleted > 0 ? 1 : 0,
+        finishedAllPawns: stats.finishedAllPawns,
+        winWithoutCapture: stats.winWithoutCapture,
+      },
+    });
+    if (progressError)
+      throw new Error(`record progress failed: ${progressError.code}`);
+  }
+}
+
+async function matchmakingSweep(service: SupabaseClient): Promise<number> {
+  const {data, error} = await service
+    .from('matchmaking_tickets')
+    .select('id, member_ids, format, created_at')
+    .eq('status', 'waiting')
+    .limit(200);
+  if (error) throw new Error(`load tickets failed: ${error.code}`);
+  const queue: QueueTicket[] = (data ?? []).map(row => ({
+    ticketId: row.id as string,
+    memberIds: row.member_ids as string[],
+    format: row.format as QueueTicket['format'],
+    enqueuedAt: Date.parse(row.created_at as string),
+  }));
+  const {matches} = runMatchmaking(queue, Date.now(), {
+    fillWithAiAfterMs: 30_000,
+  });
+  let formedCount = 0;
+  for (const formed of matches) {
+    const {data: profiles} = await service
+      .from('profiles')
+      .select('id, username')
+      .in('id', formed.humanIds);
+    const names = new Map(
+      (profiles ?? []).map(p => [p.id as string, p.username as string])
+    );
+    const seats = planSeats(formed, id => names.get(id) ?? 'Player');
+    const matchId = crypto.randomUUID();
+    const mode = formed.aiSeats > 0 ? 'mixed' : 'online';
+    const config = buildGameConfig({
+      matchId,
+      mode,
+      format: formed.format,
+      endGameMode: 'all_players',
+      seats: seats.map(s => s.seat),
+    });
+    const created = createGame(config, {now: Date.now()});
+    if (!created.ok) continue;
+    const {data: ok, error: formError} = await service.rpc(
+      'form_matchmaking_match',
+      {
+        p_ticket_ids: formed.tickets.map(t => t.ticketId),
+        p_match: matchId,
+        p_mode: config.mode,
+        p_format: formed.format,
+        p_state: created.value.state,
+        p_seats: seats.map(s => ({
+          color: s.color,
+          user_id: s.userId,
+          kind: s.userId ? 'human' : 'ai',
+        })),
+      }
+    );
+    if (formError) throw new Error(`form match failed: ${formError.code}`);
+    if (ok === true) {
+      formedCount++;
+      await authority(service).advanceAiSeats(matchId);
+    }
+  }
+  return formedCount;
 }
 
 async function startMatch(
@@ -208,6 +308,12 @@ Deno.serve(async req => {
   const service = serviceClient();
 
   try {
+    if (payload['type'] === 'MATCHMAKING_SWEEP') {
+      if (req.headers.get('Authorization') !== `Bearer ${SERVICE_KEY}`)
+        return json({error: 'FORBIDDEN'}, 403);
+      return json({formed: await matchmakingSweep(service)});
+    }
+
     if (payload['type'] === 'TIMEOUT_SWEEP') {
       if (req.headers.get('Authorization') !== `Bearer ${SERVICE_KEY}`)
         return json({error: 'FORBIDDEN'}, 403);

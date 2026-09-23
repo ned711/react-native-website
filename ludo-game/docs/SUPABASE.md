@@ -1,6 +1,6 @@
 # Configurer Supabase
 
-Statut actuel : **NON CONFIGURÉ**. Aucun projet Supabase n'est relié à ce dépôt.
+Statut actuel : **NON CONFIGURÉ**. Migrations : 9 fichiers. Aucun projet Supabase n'est relié à ce dépôt.
 Le SQL est testé sur PostgreSQL 16 local (`npm run test:db`), l'Edge Function est
 vérifiée par `deno check`. Rien n'a encore été exécuté contre un projet Supabase réel.
 
@@ -31,11 +31,15 @@ depuis `../../../src`. Si l'outil de déploiement refuse les imports hors de
 `src/economy`, `src/utils` dans `supabase/functions/_shared/` (point à valider au
 premier déploiement).
 
-## 3. Planifier le balayage des tours expirés (anti-abandon)
+## 3. Planifier les balayages serveur
 
-Appeler `POST /functions/v1/match-action` avec `{"type":"TIMEOUT_SWEEP"}` et
-l'en-tête `Authorization: Bearer <SERVICE_ROLE_KEY>` toutes les 10 à 15 secondes
-(pg_cron + pg_net, ou un scheduler externe). Ne jamais exposer cette clé au client.
+Appeler `POST /functions/v1/match-action` avec l'en-tête
+`Authorization: Bearer <SERVICE_ROLE_KEY>` (pg_cron + pg_net, ou un scheduler
+externe ; ne jamais exposer cette clé au client) :
+
+- `{"type":"TIMEOUT_SWEEP"}` toutes les 10 à 15 s (tours expirés, anti-abandon) ;
+- `{"type":"MATCHMAKING_SWEEP"}` toutes les 3 à 5 s (forme les parties à partir
+  de `matchmaking_tickets`, complète par des IA après 30 s d'attente).
 
 ## 4. Activer Realtime
 
@@ -52,8 +56,6 @@ cp .env.example .env.local
 
 ## Restant à faire côté serveur
 
-- Écran de connexion (Supabase Auth) : **À FAIRE** — les RPC exigent une session.
-- Worker de matchmaking (lit `matchmaking_tickets`, appelle `runMatchmaking`, crée
-  les matchs) : **À FAIRE**.
-- Progression des missions / succès à partir des résultats de match : **À FAIRE**.
+- Écran de compte (Supabase Auth) : **PRÉPARÉ**, à valider contre le projet.
+- Client temps réel de partie en ligne dans l'app : **À FAIRE**.
 - Notifications push (fournisseur non choisi) : **NON CONFIGURÉ**.

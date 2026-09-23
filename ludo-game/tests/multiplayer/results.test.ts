@@ -1,7 +1,12 @@
 import {readFileSync} from 'node:fs';
 import {describe, expect, it} from 'vitest';
 import {computeMatchResults} from '../../src/multiplayer/authority/results.ts';
-import {CATALOG_MIGRATION, catalogSeedSql} from '../../scripts/catalogSql.ts';
+import {
+  CATALOG_MIGRATION,
+  PROGRESSION_MIGRATION,
+  catalogSeedSql,
+  progressionSeedSql,
+} from '../../scripts/catalogSql.ts';
 import {simulate} from '../game/simulate.ts';
 import {newGame} from '../game/helpers.ts';
 
@@ -38,5 +43,8 @@ describe('match results (server side)', () => {
 describe('generated SQL', () => {
   it('the committed catalogue migration matches the TypeScript catalogue (no drift)', () => {
     expect(readFileSync(CATALOG_MIGRATION, 'utf8')).toBe(catalogSeedSql());
+    expect(readFileSync(PROGRESSION_MIGRATION, 'utf8')).toBe(
+      progressionSeedSql()
+    );
   });
 });

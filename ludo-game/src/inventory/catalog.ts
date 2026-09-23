@@ -29,6 +29,17 @@ export interface CatalogItem {
   readonly price: Price | null;
 }
 
+/** Titles unlocked by achievements (see progression/achievements.ts). */
+export const TITLES: readonly {
+  readonly id: string;
+  readonly name: string;
+  readonly rarity: Rarity;
+}[] = [
+  {id: 'veteran', name: 'Vétéran', rarity: 'rare'},
+  {id: 'hunter', name: 'Chasseur', rarity: 'rare'},
+  {id: 'pacifist', name: 'Pacifiste', rarity: 'epic'},
+];
+
 export const DEFAULT_ITEM_IDS = [
   CLASSIC_PAWN_ID,
   CLASSIC_DICE_ID,
@@ -63,6 +74,15 @@ export const CATALOG: readonly CatalogItem[] = [
     name: `Plateau ${t.displayName}`,
     rarity: t.id === 'classic' ? ('common' as const) : ('rare' as const),
     acquisition: t.id === 'classic' ? ('default' as const) : ('free' as const),
+    price: null,
+  })),
+  ...TITLES.map(t => ({
+    id: `title_${t.id}`,
+    category: 'title' as const,
+    themeId: null,
+    name: t.name,
+    rarity: t.rarity,
+    acquisition: 'free' as const,
     price: null,
   })),
   ...GIFTS.map(g => ({

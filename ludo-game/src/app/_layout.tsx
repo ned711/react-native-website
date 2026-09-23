@@ -1,6 +1,7 @@
 import {Stack} from 'expo-router';
 import {StatusBar} from 'expo-status-bar';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
+import {AuthProvider} from '../state/auth.tsx';
 import {LocalStatsProvider} from '../state/localStats.tsx';
 import {SettingsProvider} from '../state/settings.tsx';
 import {useActiveTheme} from '../components/ui/theme.ts';
@@ -26,6 +27,7 @@ function ThemedStack() {
         <Stack.Screen name="missions" options={{title: 'Missions et succès'}} />
         <Stack.Screen name="rankings" options={{title: 'Classements'}} />
         <Stack.Screen name="settings" options={{title: 'Paramètres'}} />
+        <Stack.Screen name="account" options={{title: 'Compte'}} />
       </Stack>
     </>
   );
@@ -35,9 +37,11 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <SettingsProvider>
-        <LocalStatsProvider>
-          <ThemedStack />
-        </LocalStatsProvider>
+        <AuthProvider>
+          <LocalStatsProvider>
+            <ThemedStack />
+          </LocalStatsProvider>
+        </AuthProvider>
       </SettingsProvider>
     </SafeAreaProvider>
   );
