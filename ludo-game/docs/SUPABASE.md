@@ -57,5 +57,6 @@ cp .env.example .env.local
 ## Restant à faire côté serveur
 
 - Écran de compte (Supabase Auth) : **PRÉPARÉ**, à valider contre le projet.
-- Client temps réel de partie en ligne dans l'app : **À FAIRE**.
+- Client de partie en ligne (transport Realtime + Edge Function) : **PRÉPARÉ**, à valider.
+- Le lobby interroge la salle toutes les 3 s ; passer à Realtime est une amélioration possible.
 - Notifications push (fournisseur non choisi) : **NON CONFIGURÉ**.

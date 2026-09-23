@@ -9,7 +9,6 @@ import {
   type PawnAnimation,
 } from '../components/board/Pawn.tsx';
 import {pawnKey} from '../components/board/LudoBoard.tsx';
-import {pointForPawn} from '../game/board/layout.ts';
 import type {GameEvent} from '../game/events/types.ts';
 import {LocalMatch, buildLocalConfig} from '../game/session/localMatch.ts';
 import type {DieValue, GameState, PlayerColor} from '../game/types.ts';
@@ -22,6 +21,7 @@ import {useSettings} from '../state/settings.tsx';
 import {getTheme} from '../themes/themes.ts';
 import {createSeededRandom} from '../utils/random.ts';
 import {describeEvent} from './describeEvent.ts';
+import {presentEvents} from './eventPresentation.ts';
 
 const AI_DELAY_MS = 550;
 
@@ -117,80 +117,34 @@ export function useLocalMatch(setup: MatchSetup): LocalMatchView {
     return match.subscribe((next, events) => {
       allEvents.current.push(...events);
       audio.handleEvents(events, singleHuman);
-      let busy = 0;
-      const anims = new Map<string, PawnAnimation>();
+      const presented = presentEvents(events, () => ++animationId.current);
+      const anims = presented.animations;
+      const busy = presented.busyMs;
+      if (presented.rolled !== null) {
+        const value = presented.rolled;
+        setDice(d => ({value, rollId: d.rollId + 1, rolling: true}));
+      }
       for (const event of events) {
-        switch (event.type) {
-          case 'DICE_ROLLED':
-            setDice(d => ({
-              value: event.payload.value,
-              rollId: d.rollId + 1,
-              rolling: true,
-            }));
-            break;
-          case 'PAWN_SPAWNED':
-          case 'PAWN_MOVED': {
-            if (!event.playerColor) break;
-            const color = event.playerColor;
-            const index = event.payload.pawnIndex;
-            const path = event.type === 'PAWN_MOVED' ? event.payload.path : [0];
-            anims.set(pawnKey(color, index), {
-              id: ++animationId.current,
-              kind: 'step',
-              points: path.map(pos => pointForPawn(color, pos, index)),
-            });
-            busy = Math.max(busy, path.length * STEP_MS);
-            break;
+        if (event.type === 'PLAYER_FINISHED') {
+          if (
+            event.playerColor &&
+            humanColors.includes(event.playerColor) &&
+            next.phase.kind !== 'finished'
+          ) {
+            setFinishedPrompt(event.playerColor);
           }
-          case 'ADVENTURE_EVENT_TRIGGERED': {
-            if (!event.playerColor || event.payload.from === event.payload.to)
-              break;
-            const color = event.playerColor;
-            const index = event.payload.pawnIndex;
-            const key = pawnKey(color, index);
-            const previous = anims.get(key);
-            const extra = [pointForPawn(color, event.payload.to, index)];
-            anims.set(key, {
-              id: ++animationId.current,
-              kind: 'step',
-              points: [...(previous?.points ?? []), ...extra],
+        } else if (event.type === 'GAME_FINISHED') {
+          if (singleHuman) {
+            const s = statsFromEvents(allEvents.current, singleHuman);
+            record({
+              gamesPlayed: 1,
+              wins: s.wins,
+              captures: s.captures,
+              pawnsFinished: s.pawnsFinished,
             });
-            busy += STEP_MS * 2;
-            break;
+          } else {
+            record({gamesPlayed: 1, wins: 0, captures: 0, pawnsFinished: 0});
           }
-          case 'PAWN_RETURNED':
-            if (!event.playerColor) break;
-            anims.set(pawnKey(event.playerColor, event.payload.pawnIndex), {
-              id: ++animationId.current,
-              kind: 'return',
-              points: [],
-            });
-            busy = Math.max(busy, RETURN_MS + STEP_MS * 6);
-            break;
-          case 'PLAYER_FINISHED':
-            if (
-              event.playerColor &&
-              humanColors.includes(event.playerColor) &&
-              next.phase.kind !== 'finished'
-            ) {
-              setFinishedPrompt(event.playerColor);
-            }
-            break;
-          case 'GAME_FINISHED':
-            if (singleHuman) {
-              const s = statsFromEvents(allEvents.current, singleHuman);
-              record({
-                gamesPlayed: 1,
-                wins: s.wins,
-                captures: s.captures,
-                pawnsFinished: s.pawnsFinished,
-              });
-            } else {
-              record({gamesPlayed: 1, wins: 0, captures: 0, pawnsFinished: 0});
-            }
-            break;
-          default:
-            break;
         }
       }
       if (anims.size > 0) setAnimations(prev => new Map([...prev, ...anims]));

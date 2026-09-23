@@ -28,6 +28,11 @@ function ThemedStack() {
         <Stack.Screen name="rankings" options={{title: 'Classements'}} />
         <Stack.Screen name="settings" options={{title: 'Paramètres'}} />
         <Stack.Screen name="account" options={{title: 'Compte'}} />
+        <Stack.Screen name="online" options={{title: 'En ligne'}} />
+        <Stack.Screen
+          name="online-game"
+          options={{headerShown: false, gestureEnabled: false}}
+        />
       </Stack>
     </>
   );

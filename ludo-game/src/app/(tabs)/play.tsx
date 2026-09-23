@@ -81,6 +81,12 @@ export default function PlayScreen() {
                 ? 'Le serveur autoritaire (Edge Function match-action) doit être déployé. Les salles privées et le matchmaking passent par le serveur ; ils n’ont pas été testés contre un projet Supabase réel.'
                 : online.reason}
             </AppText>
+            {online.configured ? (
+              <Button
+                label="Salles privées et matchmaking"
+                onPress={() => router.push('/online')}
+              />
+            ) : null}
           </View>
         ) : null}
       </Card>

@@ -84,7 +84,7 @@ scripts/          génération du SQL du catalogue depuis TypeScript
 | Backend SQL : profils, amis, blocage, invitations, chat, cadeaux, rooms, matchs, coffres, fragments, équipement, classements, file de matchmaking | PRÉPARÉ | testé sur PostgreSQL 16, pas sur Supabase |
 | Serveur autoritaire (Edge Function) | PRÉPARÉ | logique testée, `deno check` OK, non déployé |
 | Compte (connexion / inscription Supabase Auth) | PRÉPARÉ | non testé contre un projet réel |
-| Multijoueur en ligne dans l'app (salle d'attente, partie en ligne temps réel) | À FAIRE | le serveur existe ; le client temps réel reste à écrire |
+| Multijoueur en ligne dans l'app (salles, matchmaking, partie temps réel, reconnexion) | PRÉPARÉ | contrôleur client testé contre la vraie autorité (transport en mémoire) ; transport Supabase non exécuté contre un projet réel |
 | Amis, chat, cadeaux, coffre, classements, missions dans l'app | NON CONFIGURÉ | écrans prêts, nécessitent Supabase |
 | XP / niveaux / insignes | NON CONFIGURÉ | calcul testé, attribution serveur uniquement |
 | Worker de matchmaking | PRÉPARÉ | plan des sièges + création atomique SQL testés ; `MATCHMAKING_SWEEP` à planifier |
@@ -110,7 +110,7 @@ L'écran Paramètres > « État du projet » affiche le même tableau dans l'app
 
 ## Tests
 
-- 125 tests unitaires (plateau, mouvements, captures, tours, victoire/duel/2v2,
+- 130 tests unitaires (plateau, mouvements, captures, tours, victoire/duel/2v2, client en ligne,
   Adventure, IA sur 90 parties complètes à états gelés, replay, dé χ², autorité
   serveur, matchmaking, reconnexion, social, progression, contenu, présentation,
   session locale, absence de dérive du SQL généré).
@@ -124,8 +124,8 @@ L'écran Paramètres > « État du projet » affiche le même tableau dans l'app
 
 1. Créer le projet Supabase, `db push`, déployer `match-action`, planifier
    `TIMEOUT_SWEEP` ; tester de bout en bout contre ce projet.
-2. Client temps réel dans l'app (rooms, salle d'attente, partie en ligne,
-   reconnexion branchée sur `planSync`) ; tester l'écran de compte.
+2. Valider contre le projet l'écran de compte, le transport Realtime et le
+   lobby (salles, matchmaking) ; remplacer le sondage du lobby par Realtime.
 3. Planifier `MATCHMAKING_SWEEP` et `TIMEOUT_SWEEP`.
 4. Assets licenciés : modèles 3D, animations, textures, musiques, effets ;
    remplacer les `PLACEHOLDER_ASSET` (aucun changement de logique requis).
