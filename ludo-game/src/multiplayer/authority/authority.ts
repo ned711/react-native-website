@@ -42,6 +42,7 @@ export const AuthorityErrorCode = {
   DICE_NOT_AVAILABLE: 'DICE_NOT_AVAILABLE',
   ILLEGAL_ACTION: 'ILLEGAL_ACTION',
   CONFLICT: 'CONFLICT',
+  SEAT_CONTROLLED_BY_AI: 'SEAT_CONTROLLED_BY_AI',
 } as const;
 export type AuthorityErrorCode =
   (typeof AuthorityErrorCode)[keyof typeof AuthorityErrorCode];
@@ -139,6 +140,13 @@ export class MatchAuthority {
           return fail(
             AuthorityErrorCode.SPECTATOR_FORBIDDEN,
             'spectators cannot play'
+          );
+        }
+        // A seat handed to the AI (abandon policy) is played by the server only.
+        if (player.controller.kind === 'ai') {
+          return fail(
+            AuthorityErrorCode.SEAT_CONTROLLED_BY_AI,
+            'this seat is now played by the AI'
           );
         }
         // 5. turn
@@ -269,6 +277,52 @@ export class MatchAuthority {
       resetMissed: null,
       incrementMissed: color,
     });
+  }
+
+  /**
+   * Plays every consecutive turn that belongs to an AI seat (mixed matches,
+   * seats replaced after an abandon). Stops at the first human turn, at the end
+   * of the match, or after `maxSteps` actions. AI randomness is independent
+   * from the dice source.
+   */
+  async advanceAiSeats(
+    matchId: string,
+    maxSteps = 400
+  ): Promise<Result<AuthorityAccepted | null, AuthorityError>> {
+    let last: AuthorityAccepted | null = null;
+    const events: GameEvent[] = [];
+    for (let step = 0; step < maxSteps; step++) {
+      const match = await this.deps.store.load(matchId);
+      if (!match)
+        return fail(AuthorityErrorCode.MATCH_NOT_FOUND, 'unknown match');
+      const {state} = match;
+      if (state.phase.kind === 'finished') break;
+      const player = state.players.find(p => p.color === state.currentColor);
+      if (!player || player.controller.kind !== 'ai') break;
+      let action: GameAction;
+      if (state.phase.kind === 'awaiting_roll') {
+        action = {
+          type: 'ROLL_DICE',
+          color: player.color,
+          value: rollDie(this.deps.dice),
+        };
+      } else {
+        const ai = createAi(
+          player.controller.difficulty,
+          createSeededRandom(`${matchId}:ai:${state.version}`)
+        );
+        action = {
+          type: 'MOVE_PAWN',
+          color: player.color,
+          pawnIndex: ai.chooseMove(state, state.phase.legalMoves).pawnIndex,
+        };
+      }
+      const result = await this.commit(match, action, {resetMissed: null});
+      if (!result.ok) return result;
+      events.push(...result.value.events);
+      last = {state: result.value.state, events};
+    }
+    return ok(last);
   }
 
   private async commit(

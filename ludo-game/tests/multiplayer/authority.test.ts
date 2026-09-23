@@ -246,3 +246,100 @@ describe('turn timeout and anti-abandon', () => {
     );
   });
 });
+
+describe('AI seats in online matches', () => {
+  it('the server plays AI turns until a human must act', async () => {
+    const config = buildGameConfig({
+      matchId: 'mixed_1',
+      mode: 'mixed',
+      format: '4p',
+      endGameMode: 'all_players',
+      seats: [
+        {playerId: 'human-1', displayName: 'H1', controller: {kind: 'human'}},
+        {
+          playerId: 'ai-1',
+          displayName: 'Bot 1',
+          controller: {kind: 'ai', difficulty: 'hard'},
+        },
+        {playerId: 'human-2', displayName: 'H2', controller: {kind: 'human'}},
+        {
+          playerId: 'ai-2',
+          displayName: 'Bot 2',
+          controller: {kind: 'ai', difficulty: 'easy'},
+        },
+      ],
+    });
+    const created = createGame(config, {now: 0});
+    if (!created.ok) throw new Error();
+    const store = new InMemoryMatchStore();
+    store.put({
+      matchId: 'mixed_1',
+      state: created.value.state,
+      startedAt: 0,
+      turnStartedAt: 0,
+      missedTurns: {},
+    });
+    const authority = new MatchAuthority({
+      store,
+      dice: createSeededRandom('d'),
+      clock: () => 0,
+      logger: new MemoryLogger(),
+    });
+    for (let i = 0; i < 3000; i++) {
+      const s = (await store.load('mixed_1'))?.state;
+      if (!s || s.phase.kind === 'finished') break;
+      const current = s.players.find(p => p.color === s.currentColor);
+      if (current?.controller.kind === 'ai') {
+        const r = await authority.advanceAiSeats('mixed_1');
+        if (!r.ok) throw new Error(r.error.message);
+        const after = (await store.load('mixed_1'))?.state;
+        const next = after?.players.find(p => p.color === after.currentColor);
+        expect(
+          after?.phase.kind === 'finished' || next?.controller.kind === 'human'
+        ).toBe(true);
+        continue;
+      }
+      const intent =
+        s.phase.kind === 'awaiting_roll'
+          ? {type: 'ROLL_DICE', matchId: 'mixed_1', expectedVersion: s.version}
+          : {
+              type: 'MOVE_PAWN',
+              matchId: 'mixed_1',
+              expectedVersion: s.version,
+              pawnIndex: s.phase.legalMoves[0]?.pawnIndex,
+            };
+      const r = await authority.handleIntent(
+        {userId: current?.playerId ?? null},
+        intent
+      );
+      if (!r.ok) throw new Error(r.error.code);
+    }
+    expect((await store.load('mixed_1'))?.state.phase.kind).toBe('finished');
+  });
+
+  it('a player whose seat was handed to the AI cannot play it anymore', async () => {
+    const {authority, state, advance} = setup('online');
+    for (let i = 0; i < 40; i++) {
+      advance(21_000);
+      await authority.handleTurnTimeout('match_1');
+      if ((await state()).players.some(p => p.controller.kind === 'ai')) break;
+    }
+    const replaced = (await state()).players.find(
+      p => p.controller.kind === 'ai'
+    );
+    if (!replaced) throw new Error('no seat replaced');
+    const current = await state();
+    const attempt = await authority.handleIntent(
+      {userId: replaced.playerId},
+      {type: 'ROLL_DICE', matchId: 'match_1', expectedVersion: current.version}
+    );
+    expect(attempt.ok ? 'ok' : attempt.error.code).toBe(
+      'SEAT_CONTROLLED_BY_AI'
+    );
+    // ...and the server plays it instead.
+    const played = await authority.advanceAiSeats('match_1');
+    expect(played.ok).toBe(true);
+    const after = await state();
+    expect(after.version).toBeGreaterThan(current.version);
+  });
+});

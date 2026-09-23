@@ -42,7 +42,8 @@
     "export:web": "expo export --platform web --output-dir dist/web",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\" \"supabase/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\" \"supabase/**/*.ts\"",
-    "verify": "npm run typecheck && npm run test && npm run check:server"
+    "verify": "npm run typecheck && npm run test && npm run check:server",
+    "generate:catalog-sql": "node scripts/generate-catalog-sql.ts"
   },
   "private": true
 }
